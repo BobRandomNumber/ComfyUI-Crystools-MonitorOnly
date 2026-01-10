@@ -532,7 +532,7 @@ class CrysMonitorMonitor {
                 this.monitorUI.updateDisplay(message.data);
             }
             else {
-                original_onmessage(event);
+                original_onmessage?.(event);
             }
         };
     };
