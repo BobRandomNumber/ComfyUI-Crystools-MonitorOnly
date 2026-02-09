@@ -478,6 +478,16 @@ class CrysMonitorMonitor {
     }
   };
 
+  init = async (): Promise<void> => {
+    // Register event listener early to avoid "Unhandled message" warnings
+    api.addEventListener('crysmonitor.monitor', (event: CustomEvent) => {
+      if (event?.detail === undefined) {
+        return;
+      }
+      this.monitorUI?.updateDisplay(event.detail);
+    });
+  };
+
   setup = async (): Promise<void> => {
     if (this.monitorUI) {
       return;
@@ -517,21 +527,12 @@ class CrysMonitorMonitor {
     );
 
     this.updateDisplay(this.menuDisplayOption);
-    this.registerListeners();
-  };
-
-  registerListeners = (): void => {
-    api.addEventListener('crysmonitor.monitor', (event: CustomEvent) => {
-      if (event?.detail === undefined) {
-        return;
-      }
-      this.monitorUI.updateDisplay(event.detail);
-    });
   };
 }
 
 const crysmonitorMonitor = new CrysMonitorMonitor();
 app.registerExtension({
   name: crysmonitorMonitor.idExtensionName,
+  init: crysmonitorMonitor.init,
   setup: crysmonitorMonitor.setup,
 });

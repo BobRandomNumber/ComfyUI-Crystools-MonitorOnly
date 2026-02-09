@@ -495,6 +495,15 @@ class CrysMonitorMonitor {
             throw new Error(resp.statusText);
         }
     };
+    init = async () => {
+        // Register event listener early to avoid "Unhandled message" warnings
+        api.addEventListener('crysmonitor.monitor', (event) => {
+            if (event?.detail === undefined) {
+                return;
+            }
+            this.monitorUI?.updateDisplay(event.detail);
+        });
+    };
     setup = async () => {
         if (this.monitorUI) {
             return;
@@ -519,27 +528,12 @@ class CrysMonitorMonitor {
         app.menu?.settingsGroup.element.before(this.crysmonitorButtonGroup);
         this.monitorUI = new MonitorUI(this.crysmonitorButtonGroup, this.monitorCPUElement, this.monitorRAMElement, this.monitorHDDElement, this.monitorGPUSettings, this.monitorVRAMSettings, this.monitorTemperatureSettings, currentRate);
         this.updateDisplay(this.menuDisplayOption);
-        this.registerListeners();
-    };
-    registerListeners = () => {
-        const original_onmessage = api.socket.onmessage;
-        api.socket.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === 'crysmonitor.monitor') {
-                if (message.data === undefined) {
-                    return;
-                }
-                this.monitorUI.updateDisplay(message.data);
-            }
-            else {
-                original_onmessage?.(event);
-            }
-        };
     };
 }
 const crysmonitorMonitor = new CrysMonitorMonitor();
 app.registerExtension({
     name: crysmonitorMonitor.idExtensionName,
+    init: crysmonitorMonitor.init,
     setup: crysmonitorMonitor.setup,
 });
 //# sourceMappingURL=monitor.js.map
