@@ -3,10 +3,6 @@ export function addStylesheet(folderName) {
     const version = Math.random().toString(36).substring(7);
     utils.addStylesheet(`extensions/${folderName}/monitor.css?v=${version}`);
 }
-export var Styles;
-(function (Styles) {
-    Styles["BARS"] = "BARS";
-})(Styles || (Styles = {}));
 export var Colors;
 (function (Colors) {
     Colors["CPU"] = "#0AA015";

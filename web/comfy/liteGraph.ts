@@ -25,7 +25,7 @@ export class TLGraphNode extends LGraphNode {
   widgets_values?: any[];
   name?: string;
 
-  prototype: TLGraphNode; // yes itself
+  prototype!: TLGraphNode; // yes itself
 }
 
 // from globals
