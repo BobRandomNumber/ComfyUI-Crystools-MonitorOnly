@@ -217,8 +217,5 @@ export class MonitorUI extends ProgressBarUIBase {
             monitorSettings.htmlMonitorRef.style.display = value ? 'flex' : 'none';
         }
     };
-    resetMaxVRAM = () => {
-        this.maxVRAMUsed = {};
-    };
 }
 //# sourceMappingURL=monitorUI.js.map

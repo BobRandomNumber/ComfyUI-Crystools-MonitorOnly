@@ -13,6 +13,7 @@ class CrysMonitorMonitor {
 
   private settingsRate: TMonitorSettings = null!;
   private settingsMonitorHeight: TMonitorSettings = null!;
+  private settingsMonitorHeightLegacy: TMonitorSettings = null!;
   private settingsMonitorWidth: TMonitorSettings = null!;
   private monitorCPUElement: TMonitorSettings = null!;
   private monitorRAMElement: TMonitorSettings = null!;
@@ -27,7 +28,9 @@ class CrysMonitorMonitor {
   private readonly monitorWidthId = 'CrysMonitor.MonitorWidth';
   private readonly monitorWidth = 60;
   private readonly monitorHeightId = 'CrysMonitor.MonitorHeight';
-  private readonly monitorHeight = 30;
+  private readonly monitorHeight = 40;
+  private readonly monitorHeightLegacyId = 'CrysMonitor.MonitorHeightLegacy';
+  private readonly monitorHeightLegacy = 19;
 
   createSettingsRate = (): void => {
     this.settingsRate = {
@@ -128,9 +131,9 @@ class CrysMonitorMonitor {
   createSettingsMonitorHeight = (): void => {
     this.settingsMonitorHeight = {
       id: this.monitorHeightId,
-      name: 'Pixel Height',
+      name: 'Pixel Height (New Menu)',
       category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'height'],
-      tooltip: 'The height of the monitor in pixels on the UI (only on top/bottom UI)',
+      tooltip: 'The height of the monitor in pixels when using new menu (Top/Bottom)',
       type: 'slider',
       attrs: {
         min: 16,
@@ -152,8 +155,47 @@ class CrysMonitorMonitor {
           return;
         }
 
-        const w = await app.extensionManager.setting.get(this.monitorWidthId);
-        this.monitorUI?.updateMonitorSize(w, valueNumber);
+        // Only apply if new menu is active
+        if (this.menuDisplayOption !== MenuDisplayOptions.Disabled) {
+          const w = await app.extensionManager.setting.get(this.monitorWidthId);
+          this.monitorUI?.updateMonitorSize(w, valueNumber);
+        }
+      },
+    };
+  };
+
+  createSettingsMonitorHeightLegacy = (): void => {
+    this.settingsMonitorHeightLegacy = {
+      id: this.monitorHeightLegacyId,
+      name: 'Pixel Height (Legacy Menu)',
+      category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'height-legacy'],
+      tooltip: 'The height of the monitor in pixels when using legacy menu (Disabled)',
+      type: 'slider',
+      attrs: {
+        min: 16,
+        max: 50,
+        step: 1,
+      },
+      defaultValue: this.monitorHeightLegacy,
+      // @ts-ignore
+      onChange: async(value: string): void => {
+        let valueNumber: number;
+
+        try {
+          valueNumber = parseInt(value);
+          if (isNaN(valueNumber)) {
+            throw new Error('invalid value');
+          }
+        } catch (error) {
+          console.error(error);
+          return;
+        }
+
+        // Only apply if legacy menu is active
+        if (this.menuDisplayOption === MenuDisplayOptions.Disabled) {
+          const w = await app.extensionManager.setting.get(this.monitorWidthId);
+          this.monitorUI?.updateMonitorSize(w, valueNumber);
+        }
       },
     };
   };
@@ -337,6 +379,7 @@ class CrysMonitorMonitor {
   createSettings = (): void => {
     app.ui.settings.addSetting(this.settingsRate);
     app.ui.settings.addSetting(this.settingsMonitorHeight);
+    app.ui.settings.addSetting(this.settingsMonitorHeightLegacy);
     app.ui.settings.addSetting(this.settingsMonitorWidth);
     app.ui.settings.addSetting(this.monitorRAMElement);
     app.ui.settings.addSetting(this.monitorCPUElement);
@@ -366,7 +409,13 @@ class CrysMonitorMonitor {
     this.moveMonitor(this.menuDisplayOption);
 
     const w = app.extensionManager.setting.get(this.monitorWidthId);
-    const h = app.extensionManager.setting.get(this.monitorHeightId);
+    // Use correct height based on menu mode
+    let h: number;
+    if (this.menuDisplayOption === MenuDisplayOptions.Disabled) {
+      h = app.extensionManager.setting.get(this.monitorHeightLegacyId);
+    } else {
+      h = app.extensionManager.setting.get(this.monitorHeightId);
+    }
     this.monitorUI.updateMonitorSize(w, h);
   };
 
@@ -374,6 +423,17 @@ class CrysMonitorMonitor {
     if (value !== this.menuDisplayOption) {
       this.menuDisplayOption = value;
       this.moveMonitor(this.menuDisplayOption);
+      // Auto-adjust height based on menu mode
+      const w = app.extensionManager.setting.get(this.monitorWidthId);
+      let h: number;
+      if (value === MenuDisplayOptions.Disabled) {
+        // Legacy menu - use legacy height
+        h = app.extensionManager.setting.get(this.monitorHeightLegacyId);
+      } else {
+        // New menu (Top/Bottom) - use standard height
+        h = app.extensionManager.setting.get(this.monitorHeightId);
+      }
+      this.monitorUI?.updateMonitorSize(w, h);
     }
   };
 
@@ -478,6 +538,16 @@ class CrysMonitorMonitor {
     }
   };
 
+  init = async (): Promise<void> => {
+    // Register event listener early to avoid "Unhandled message" warnings
+    api.addEventListener('crysmonitor.monitor', (event: CustomEvent) => {
+      if (event?.detail === undefined) {
+        return;
+      }
+      this.monitorUI?.updateDisplay(event.detail);
+    });
+  };
+
   setup = async (): Promise<void> => {
     if (this.monitorUI) {
       return;
@@ -486,6 +556,7 @@ class CrysMonitorMonitor {
     addStylesheet(this.folderName);
     this.createSettingsRate();
     this.createSettingsMonitorHeight();
+    this.createSettingsMonitorHeightLegacy();
     this.createSettingsMonitorWidth();
     this.createSettingsCPU();
     this.createSettingsRAM();
@@ -517,21 +588,12 @@ class CrysMonitorMonitor {
     );
 
     this.updateDisplay(this.menuDisplayOption);
-    this.registerListeners();
-  };
-
-  registerListeners = (): void => {
-    api.addEventListener('crysmonitor.monitor', (event: CustomEvent) => {
-      if (event?.detail === undefined) {
-        return;
-      }
-      this.monitorUI.updateDisplay(event.detail);
-    });
   };
 }
 
 const crysmonitorMonitor = new CrysMonitorMonitor();
 app.registerExtension({
   name: crysmonitorMonitor.idExtensionName,
+  init: crysmonitorMonitor.init,
   setup: crysmonitorMonitor.setup,
 });

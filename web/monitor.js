@@ -1,23 +1,17 @@
 import { app, api } from './comfy/index.js';
 import { commonPrefix } from './common.js';
 import { MonitorUI } from './monitorUI.js';
-import { Colors, addStylesheet } from './styles.js';
-import { convertNumberToPascalCase } from './utils.js';
+import { addStylesheet, Colors } from './styles.js';
 import { ComfyKeyMenuDisplayOption, MenuDisplayOptions } from './progressBarUIBase.js';
-// enum MonitorPosition {
-//   'Top' = 'Top',
-//   'Sidebar' = 'Sidebar',
-//   'Floating' = 'Floating',
-// }
 class CrysMonitorMonitor {
     idExtensionName = 'CrysMonitor.monitor';
     menuPrefix = commonPrefix;
     menuDisplayOption = MenuDisplayOptions.Disabled;
     folderName = '';
     crysmonitorButtonGroup = null;
-    // private settingsMonitorPosition: TMonitorSettings;
     settingsRate = null;
     settingsMonitorHeight = null;
+    settingsMonitorHeightLegacy = null;
     settingsMonitorWidth = null;
     monitorCPUElement = null;
     monitorRAMElement = null;
@@ -27,39 +21,12 @@ class CrysMonitorMonitor {
     monitorVRAMSettings = [];
     monitorTemperatureSettings = [];
     monitorUI = null;
-    // private readonly monitorPositionId = 'CrysMonitor.MonitorPosition';
     monitorWidthId = 'CrysMonitor.MonitorWidth';
     monitorWidth = 60;
     monitorHeightId = 'CrysMonitor.MonitorHeight';
-    monitorHeight = 30;
-    // NO POSIBLE TO IMPLEMENT INSIDE THE PANEL
-    // createSettingsMonitorPosition = (): void => {
-    //   const position = app.extensionManager.setting.get(this.monitorPositionId);
-    //   console.log('position', position);
-    //   this.settingsMonitorPosition = {
-    //     id: this.monitorPositionId,
-    //     name: 'Position (floating not implemented yet)',
-    //     category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'position'],
-    //     tooltip: 'Only for new UI',
-    //     experimental: true,
-    //     // data: [],
-    //     type: 'combo',
-    //     options: [
-    //       MonitorPoistion.Top,
-    //       MonitorPoistion.Sidebar,
-    //       MonitorPoistion.Floating
-    //     ],
-    //
-    //     defaultValue: MonitorPoistion.Sidebar,
-    //     // @ts-ignore
-    //     onChange: (_value: string): void => {
-    //       // if (this.monitorUI) {
-    //       // console.log('onChange', _value);
-    //       //   this.moveMonitor(this.menuDisplayOption);
-    //       // }
-    //     },
-    //   };
-    // };
+    monitorHeight = 40;
+    monitorHeightLegacyId = 'CrysMonitor.MonitorHeightLegacy';
+    monitorHeightLegacy = 19;
     createSettingsRate = () => {
         this.settingsRate = {
             id: 'CrysMonitor.RefreshRate',
@@ -153,9 +120,9 @@ class CrysMonitorMonitor {
     createSettingsMonitorHeight = () => {
         this.settingsMonitorHeight = {
             id: this.monitorHeightId,
-            name: 'Pixel Height',
+            name: 'Pixel Height (New Menu)',
             category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'height'],
-            tooltip: 'The height of the monitor in pixels on the UI (only on top/bottom UI)',
+            tooltip: 'The height of the monitor in pixels when using new menu (Top/Bottom)',
             type: 'slider',
             attrs: {
                 min: 16,
@@ -176,8 +143,45 @@ class CrysMonitorMonitor {
                     console.error(error);
                     return;
                 }
-                const w = await app.extensionManager.setting.get(this.monitorWidthId);
-                this.monitorUI?.updateMonitorSize(w, valueNumber);
+                // Only apply if new menu is active
+                if (this.menuDisplayOption !== MenuDisplayOptions.Disabled) {
+                    const w = await app.extensionManager.setting.get(this.monitorWidthId);
+                    this.monitorUI?.updateMonitorSize(w, valueNumber);
+                }
+            },
+        };
+    };
+    createSettingsMonitorHeightLegacy = () => {
+        this.settingsMonitorHeightLegacy = {
+            id: this.monitorHeightLegacyId,
+            name: 'Pixel Height (Legacy Menu)',
+            category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'height-legacy'],
+            tooltip: 'The height of the monitor in pixels when using legacy menu (Disabled)',
+            type: 'slider',
+            attrs: {
+                min: 16,
+                max: 50,
+                step: 1,
+            },
+            defaultValue: this.monitorHeightLegacy,
+            // @ts-ignore
+            onChange: async (value) => {
+                let valueNumber;
+                try {
+                    valueNumber = parseInt(value);
+                    if (isNaN(valueNumber)) {
+                        throw new Error('invalid value');
+                    }
+                }
+                catch (error) {
+                    console.error(error);
+                    return;
+                }
+                // Only apply if legacy menu is active
+                if (this.menuDisplayOption === MenuDisplayOptions.Disabled) {
+                    const w = await app.extensionManager.setting.get(this.monitorWidthId);
+                    this.monitorUI?.updateMonitorSize(w, valueNumber);
+                }
             },
         };
     };
@@ -223,21 +227,19 @@ class CrysMonitorMonitor {
             },
         };
     };
-    createSettingsGPUUsage = (name, index, moreThanOneGPU) => {
+    createSettingsGPUUsage = (name, index) => {
         if (name === undefined || index === undefined) {
             console.warn('getGPUsFromServer: name or index undefined', name, index);
             return;
         }
-        let label = 'GPU ';
-        label += moreThanOneGPU ? index : '';
         const monitorGPUNElement = {
-            id: 'CrysMonitor.ShowGpuUsage' + convertNumberToPascalCase(index),
+            id: 'CrysMonitor.ShowGpuUsage',
             name: ' Usage',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU [${index}] ${name}`, 'Usage'],
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'Usage'],
             type: 'boolean',
-            label,
+            label: 'GPU',
             symbol: '%',
-            monitorTitle: `${index}: ${name}`,
+            monitorTitle: `0: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -253,22 +255,20 @@ class CrysMonitorMonitor {
         app.ui.settings.addSetting(this.monitorGPUSettings[index]);
         this.monitorUI.createDOMGPUMonitor(this.monitorGPUSettings[index]);
     };
-    createSettingsGPUVRAM = (name, index, moreThanOneGPU) => {
+    createSettingsGPUVRAM = (name, index) => {
         if (name === undefined || index === undefined) {
             console.warn('getGPUsFromServer: name or index undefined', name, index);
             return;
         }
-        let label = 'VRAM ';
-        label += moreThanOneGPU ? index : '';
         // GPU VRAM Variables
         const monitorVRAMNElement = {
-            id: 'CrysMonitor.ShowGpuVram' + convertNumberToPascalCase(index),
+            id: 'CrysMonitor.ShowGpuVram',
             name: 'VRAM',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU [${index}] ${name}`, 'VRAM'],
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'VRAM'],
             type: 'boolean',
-            label: label,
+            label: 'VRAM',
             symbol: '%',
-            monitorTitle: `${index}: ${name}`,
+            monitorTitle: `0: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -284,22 +284,20 @@ class CrysMonitorMonitor {
         app.ui.settings.addSetting(this.monitorVRAMSettings[index]);
         this.monitorUI.createDOMGPUMonitor(this.monitorVRAMSettings[index]);
     };
-    createSettingsGPUTemp = (name, index, moreThanOneGPU) => {
+    createSettingsGPUTemp = (name, index) => {
         if (name === undefined || index === undefined) {
             console.warn('getGPUsFromServer: name or index undefined', name, index);
             return;
         }
-        let label = 'Temp ';
-        label += moreThanOneGPU ? index : '';
         // GPU Temperature Variables
         const monitorTemperatureNElement = {
-            id: 'CrysMonitor.ShowGpuTemperature' + convertNumberToPascalCase(index),
+            id: 'CrysMonitor.ShowGpuTemperature',
             name: 'Temperature',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU [${index}] ${name}`, 'Temperature'],
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'Temperature'],
             type: 'boolean',
-            label: label,
+            label: 'Temp',
             symbol: '°',
-            monitorTitle: `${index}: ${name}`,
+            monitorTitle: `0: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -353,8 +351,8 @@ class CrysMonitorMonitor {
     createSettings = () => {
         app.ui.settings.addSetting(this.settingsRate);
         app.ui.settings.addSetting(this.settingsMonitorHeight);
+        app.ui.settings.addSetting(this.settingsMonitorHeightLegacy);
         app.ui.settings.addSetting(this.settingsMonitorWidth);
-        // app.ui.settings.addSetting(this.settingsMonitorPosition);
         app.ui.settings.addSetting(this.monitorRAMElement);
         app.ui.settings.addSetting(this.monitorCPUElement);
         void this.getHDDsFromServer().then((data) => {
@@ -364,15 +362,12 @@ class CrysMonitorMonitor {
         });
         app.ui.settings.addSetting(this.monitorHDDElement);
         void this.getGPUsFromServer().then((gpus) => {
-            let moreThanOneGPU = false;
-            if (gpus.length > 1) {
-                moreThanOneGPU = true;
+            if (gpus.length > 0) {
+                const { name, index } = gpus[0];
+                this.createSettingsGPUTemp(name, index);
+                this.createSettingsGPUVRAM(name, index);
+                this.createSettingsGPUUsage(name, index);
             }
-            gpus?.forEach(({ name, index }) => {
-                this.createSettingsGPUTemp(name, index, moreThanOneGPU);
-                this.createSettingsGPUVRAM(name, index, moreThanOneGPU);
-                this.createSettingsGPUUsage(name, index, moreThanOneGPU);
-            });
             this.finishedLoad();
         });
     };
@@ -381,18 +376,35 @@ class CrysMonitorMonitor {
         this.updateAllWidget();
         this.moveMonitor(this.menuDisplayOption);
         const w = app.extensionManager.setting.get(this.monitorWidthId);
-        const h = app.extensionManager.setting.get(this.monitorHeightId);
+        // Use correct height based on menu mode
+        let h;
+        if (this.menuDisplayOption === MenuDisplayOptions.Disabled) {
+            h = app.extensionManager.setting.get(this.monitorHeightLegacyId);
+        }
+        else {
+            h = app.extensionManager.setting.get(this.monitorHeightId);
+        }
         this.monitorUI.updateMonitorSize(w, h);
     };
     updateDisplay = (value) => {
         if (value !== this.menuDisplayOption) {
             this.menuDisplayOption = value;
             this.moveMonitor(this.menuDisplayOption);
+            // Auto-adjust height based on menu mode
+            const w = app.extensionManager.setting.get(this.monitorWidthId);
+            let h;
+            if (value === MenuDisplayOptions.Disabled) {
+                // Legacy menu - use legacy height
+                h = app.extensionManager.setting.get(this.monitorHeightLegacyId);
+            }
+            else {
+                // New menu (Top/Bottom) - use standard height
+                h = app.extensionManager.setting.get(this.monitorHeightId);
+            }
+            this.monitorUI?.updateMonitorSize(w, h);
         }
     };
     moveMonitor = (menuPosition) => {
-        // console.log('moveMonitor', menuPosition);
-        // setTimeout(() => {
         let parentElement;
         switch (menuPosition) {
             case MenuDisplayOptions.Disabled:
@@ -406,20 +418,8 @@ class CrysMonitorMonitor {
                 break;
             case MenuDisplayOptions.Top:
             case MenuDisplayOptions.Bottom:
-                // const position = app.extensionManager.setting.get(this.monitorPositionId);
-                // if(position === MonitorPosition.Top) {
                 app.menu?.settingsGroup.element.before(this.crysmonitorButtonGroup);
-            // } else {
-            //   parentElement = document.getElementsByClassName('comfy-vue-side-bar-header')[0];
-            //   if(parentElement){
-            //     parentElement.insertBefore(this.crysmonitorButtonGroup, parentElement.firstChild);
-            //   } else {
-            //     console.error('CrysMonitor: parentElement to move monitors not found! back to top');
-            //     app.ui.settings.setSettingValue(this.monitorPositionId, MonitorPoistion.Top);
-            //   }
-            // }
         }
-        // }, 100);
     };
     updateAllWidget = () => {
         this.updateWidget(this.monitorCPUElement);
@@ -495,15 +495,24 @@ class CrysMonitorMonitor {
             throw new Error(resp.statusText);
         }
     };
+    init = async () => {
+        // Register event listener early to avoid "Unhandled message" warnings
+        api.addEventListener('crysmonitor.monitor', (event) => {
+            if (event?.detail === undefined) {
+                return;
+            }
+            this.monitorUI?.updateDisplay(event.detail);
+        });
+    };
     setup = async () => {
         if (this.monitorUI) {
             return;
         }
         await this.getFolderName();
         addStylesheet(this.folderName);
-        // this.createSettingsMonitorPosition();
         this.createSettingsRate();
         this.createSettingsMonitorHeight();
+        this.createSettingsMonitorHeightLegacy();
         this.createSettingsMonitorWidth();
         this.createSettingsCPU();
         this.createSettingsRAM();
@@ -519,27 +528,12 @@ class CrysMonitorMonitor {
         app.menu?.settingsGroup.element.before(this.crysmonitorButtonGroup);
         this.monitorUI = new MonitorUI(this.crysmonitorButtonGroup, this.monitorCPUElement, this.monitorRAMElement, this.monitorHDDElement, this.monitorGPUSettings, this.monitorVRAMSettings, this.monitorTemperatureSettings, currentRate);
         this.updateDisplay(this.menuDisplayOption);
-        this.registerListeners();
-    };
-    registerListeners = () => {
-        const original_onmessage = api.socket.onmessage;
-        api.socket.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === 'crysmonitor.monitor') {
-                if (message.data === undefined) {
-                    return;
-                }
-                this.monitorUI.updateDisplay(message.data);
-            }
-            else {
-                original_onmessage?.(event);
-            }
-        };
     };
 }
 const crysmonitorMonitor = new CrysMonitorMonitor();
 app.registerExtension({
     name: crysmonitorMonitor.idExtensionName,
+    init: crysmonitorMonitor.init,
     setup: crysmonitorMonitor.setup,
 });
 //# sourceMappingURL=monitor.js.map
