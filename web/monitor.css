@@ -48,7 +48,7 @@
       flex-grow: 1;
       position: relative;
       overflow: hidden;
-      background-color: var(--content-hover-bg)
+      background-color: var(--content-hover-bg);
     }
 
     .crysmonitor-slider {
