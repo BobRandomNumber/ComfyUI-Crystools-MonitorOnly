@@ -113,8 +113,12 @@ export class MonitorUI extends ProgressBarUIBase {
 
         this.updateMonitor(monitorSettings, gpu.gpu_temperature);
         if (monitorSettings.cssColorFinal && monitorSettings.htmlMonitorSliderRef) {
-          monitorSettings.htmlMonitorSliderRef.style.backgroundColor =
-            `color-mix(in srgb, ${monitorSettings.cssColorFinal} ${gpu.gpu_temperature}%, ${monitorSettings.cssColor})`;
+          const tempFloored = Math.floor(gpu.gpu_temperature);
+          if (monitorSettings._lastTempColor !== tempFloored) {
+            monitorSettings._lastTempColor = tempFloored;
+            monitorSettings.htmlMonitorSliderRef.style.backgroundColor =
+              `color-mix(in srgb, ${monitorSettings.cssColorFinal} ${tempFloored}%, ${monitorSettings.cssColor})`;
+          }
         }
       } else {
         // console.error('UpdateAllMonitors: no GPU VRAM data for index', index);
@@ -132,8 +136,19 @@ export class MonitorUI extends ProgressBarUIBase {
       return;
     }
 
+    const flooredPercent = Math.floor(percent);
+    // Skip all DOM writes if nothing has changed
+    if (monitorSettings._lastPercent === flooredPercent &&
+        monitorSettings._lastUsed === used &&
+        monitorSettings._lastTotal === total) {
+      return;
+    }
+    monitorSettings._lastPercent = flooredPercent;
+    monitorSettings._lastUsed = used;
+    monitorSettings._lastTotal = total;
+
     const prefix = monitorSettings.monitorTitle ? monitorSettings.monitorTitle + ' - ' : '';
-    let title = `${Math.floor(percent)}${monitorSettings.symbol}`;
+    let title = `${flooredPercent}${monitorSettings.symbol}`;
     let postfix = '';
 
     // Add max VRAM tracking for VRAM monitors
@@ -161,8 +176,8 @@ export class MonitorUI extends ProgressBarUIBase {
     if (monitorSettings.htmlMonitorRef) {
       monitorSettings.htmlMonitorRef.title = title;
     }
-    monitorSettings.htmlMonitorLabelRef.innerHTML = `${Math.floor(percent)}${monitorSettings.symbol}`;
-    monitorSettings.htmlMonitorSliderRef.style.width = `${Math.floor(percent)}%`;
+    monitorSettings.htmlMonitorLabelRef.textContent = `${flooredPercent}${monitorSettings.symbol}`;
+    monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${(flooredPercent / 100).toFixed(4)})`;
   };
 
   updateAllAnimationDuration = (value: number): void => {
@@ -186,7 +201,7 @@ export class MonitorUI extends ProgressBarUIBase {
       return;
     }
 
-    slider.style.transition = `width ${value.toFixed(1)}s`;
+    slider.style.transition = `transform ${value.toFixed(1)}s linear`;
   };
 
   createMonitor = (monitorSettings?: TMonitorSettings): HTMLDivElement => {
@@ -229,7 +244,7 @@ export class MonitorUI extends ProgressBarUIBase {
     htmlMonitorLabel.classList.add('crysmonitor-label');
     monitorSettings.htmlMonitorLabelRef = htmlMonitorLabel;
     htmlMonitorContent.append(htmlMonitorLabel);
-    htmlMonitorLabel.innerHTML = '0%';
+    htmlMonitorLabel.textContent = '0%';
     return monitorSettings.htmlMonitorRef;
   };
 

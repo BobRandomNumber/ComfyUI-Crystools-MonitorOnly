@@ -44,7 +44,7 @@ class CrysMonitorMonitor {
         max: 2,
         step: .25,
       },
-      defaultValue: .5,
+      defaultValue: 1,
 
       // @ts-ignore
       onChange: async(value: string): Promise<void> => {
@@ -209,7 +209,7 @@ class CrysMonitorMonitor {
       type: 'boolean',
       label: 'CPU',
       symbol: '%',
-      defaultValue: true,
+      defaultValue: false,
       htmlMonitorRef: undefined,
       htmlMonitorSliderRef: undefined,
       htmlMonitorLabelRef: undefined,
@@ -258,7 +258,7 @@ class CrysMonitorMonitor {
       label: 'GPU',
       symbol: '%',
       monitorTitle: `0: ${name}`,
-      defaultValue: true,
+      defaultValue: false,
       htmlMonitorRef: undefined,
       htmlMonitorSliderRef: undefined,
       htmlMonitorLabelRef: undefined,
