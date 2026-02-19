@@ -177,7 +177,7 @@ export class MonitorUI extends ProgressBarUIBase {
       monitorSettings.htmlMonitorRef.title = title;
     }
     monitorSettings.htmlMonitorLabelRef.textContent = `${flooredPercent}${monitorSettings.symbol}`;
-    monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${(flooredPercent / 100).toFixed(4)})`;
+    monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${Math.min(flooredPercent / 100, 1).toFixed(4)})`;
   };
 
   updateAllAnimationDuration = (value: number): void => {
