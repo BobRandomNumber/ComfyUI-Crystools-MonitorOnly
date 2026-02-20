@@ -23,6 +23,12 @@ class CrysMonitorMonitor {
   private monitorVRAMSettings: TMonitorSettings[] = [];
   private monitorTemperatureSettings: TMonitorSettings[] = [];
 
+  private settingsDisableSmooth: TMonitorSettings = null!;
+  private settingsNumbersOnly: TMonitorSettings = null!;
+
+  private readonly disableSmoothId = 'CrysMonitor.DisableSmooth';
+  private readonly numbersOnlyId = 'CrysMonitor.NumbersOnly';
+
   private monitorUI: MonitorUI = null!;
 
   private readonly monitorWidthId = 'CrysMonitor.MonitorWidth';
@@ -44,7 +50,7 @@ class CrysMonitorMonitor {
         max: 2,
         step: .25,
       },
-      defaultValue: .5,
+      defaultValue: 1,
 
       // @ts-ignore
       onChange: async(value: string): Promise<void> => {
@@ -196,6 +202,48 @@ class CrysMonitorMonitor {
           const w = await app.extensionManager.setting.get(this.monitorWidthId);
           this.monitorUI?.updateMonitorSize(w, valueNumber);
         }
+      },
+    };
+  };
+
+  createSettingsDisableSmooth = (): void => {
+    this.settingsDisableSmooth = {
+      id: this.disableSmoothId,
+      name: 'Disable Smooth Animation',
+      category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'refresh-smooth'],
+      tooltip: 'When enabled, bars update instantly without smooth transitions',
+      type: 'boolean',
+      label: '',
+      symbol: '',
+      defaultValue: false,
+      htmlMonitorRef: undefined,
+      htmlMonitorSliderRef: undefined,
+      htmlMonitorLabelRef: undefined,
+      cssColor: '',
+      // @ts-ignore
+      onChange: (value: boolean): void => {
+        this.monitorUI?.setDisableSmooth(value);
+      },
+    };
+  };
+
+  createSettingsNumbersOnly = (): void => {
+    this.settingsNumbersOnly = {
+      id: this.numbersOnlyId,
+      name: 'Show Numbers Only',
+      category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'refresh-text'],
+      tooltip: 'When enabled, hides the colored bar and shows only the numeric value',
+      type: 'boolean',
+      label: '',
+      symbol: '',
+      defaultValue: false,
+      htmlMonitorRef: undefined,
+      htmlMonitorSliderRef: undefined,
+      htmlMonitorLabelRef: undefined,
+      cssColor: '',
+      // @ts-ignore
+      onChange: (value: boolean): void => {
+        this.monitorUI?.setNumbersOnly(value);
       },
     };
   };
@@ -378,6 +426,8 @@ class CrysMonitorMonitor {
 
   createSettings = (): void => {
     app.ui.settings.addSetting(this.settingsRate);
+    app.ui.settings.addSetting(this.settingsDisableSmooth);
+    app.ui.settings.addSetting(this.settingsNumbersOnly);
     app.ui.settings.addSetting(this.settingsMonitorHeight);
     app.ui.settings.addSetting(this.settingsMonitorHeightLegacy);
     app.ui.settings.addSetting(this.settingsMonitorWidth);
@@ -558,6 +608,8 @@ class CrysMonitorMonitor {
     this.createSettingsMonitorHeight();
     this.createSettingsMonitorHeightLegacy();
     this.createSettingsMonitorWidth();
+    this.createSettingsDisableSmooth();
+    this.createSettingsNumbersOnly();
     this.createSettingsCPU();
     this.createSettingsRAM();
     this.createSettingsHDD();
@@ -576,6 +628,9 @@ class CrysMonitorMonitor {
     this.crysmonitorButtonGroup.id = 'crysmonitor-monitors-root';
     app.menu?.settingsGroup.element.before(this.crysmonitorButtonGroup);
 
+    const disableSmooth = !!app.extensionManager.setting.get(this.disableSmoothId);
+    const numbersOnly = !!app.extensionManager.setting.get(this.numbersOnlyId);
+
     this.monitorUI = new MonitorUI(
       this.crysmonitorButtonGroup,
       this.monitorCPUElement,
@@ -585,6 +640,8 @@ class CrysMonitorMonitor {
       this.monitorVRAMSettings,
       this.monitorTemperatureSettings,
       currentRate,
+      disableSmooth,
+      numbersOnly,
     );
 
     this.updateDisplay(this.menuDisplayOption);

@@ -14,4 +14,3 @@ export function createStyleSheet(id) {
     document.head.appendChild(style);
     return style;
 }
-//# sourceMappingURL=utils.js.map
