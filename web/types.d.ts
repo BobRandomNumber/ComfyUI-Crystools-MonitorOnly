@@ -17,6 +17,11 @@ type TMonitorSettings = {
   options?: string[];
   experimental?: boolean;
   title?: string;
+  // Runtime cache fields — skip DOM writes when value unchanged
+  _lastPercent?: number;
+  _lastUsed?: number;
+  _lastTotal?: number;
+  _lastTempColor?: number;
 }
 
 type TStatsData = {

@@ -23,4 +23,3 @@ export class ProgressBarUIBase {
         }
     }
 }
-//# sourceMappingURL=progressBarUIBase.js.map

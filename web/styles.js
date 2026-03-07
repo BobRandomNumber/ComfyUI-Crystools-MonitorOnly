@@ -13,4 +13,3 @@ export var Colors;
     Colors["TEMP_START"] = "#00ff00";
     Colors["TEMP_END"] = "#ff0000";
 })(Colors || (Colors = {}));
-//# sourceMappingURL=styles.js.map

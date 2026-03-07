@@ -5,6 +5,12 @@ export class MonitorUI extends ProgressBarUIBase {
   lastMonitor = 1; // just for order on monitors section
   styleSheet: HTMLStyleElement;
   maxVRAMUsed: Record<number, number> = {}; // Add this to track max VRAM per GPU
+  private _disableSmooth = false;
+  private _numbersOnly = false;
+  private _numbersOnlySheet: HTMLStyleElement;
+  private _disableSmoothSheet: HTMLStyleElement;
+  private _pendingData: TStatsData | null = null;
+  private _rafId = 0;
 
   constructor(
     public override rootElement: HTMLElement,
@@ -15,11 +21,21 @@ export class MonitorUI extends ProgressBarUIBase {
     private monitorVRAMSettings: TMonitorSettings[],
     private monitorTemperatureSettings: TMonitorSettings[],
     private currentRate: number,
+    disableSmooth: boolean = false,
+    numbersOnly: boolean = false,
   ) {
     super('crysmonitor-monitors-root', rootElement);
+    this._disableSmooth = disableSmooth;
+    this._numbersOnly = numbersOnly;
+    this._numbersOnlySheet = createStyleSheet('crysmonitor-numbers-only');
+    this._disableSmoothSheet = createStyleSheet('crysmonitor-disable-smooth');
     this.createDOM();
 
     this.styleSheet = createStyleSheet('crysmonitor-monitors-size');
+
+    // Apply initial states
+    this._applyNumbersOnlyCSS();
+    this._applyDisableSmoothCSS();
   }
 
   createDOM = (): void => {
@@ -66,6 +82,27 @@ export class MonitorUI extends ProgressBarUIBase {
   };
 
   updateDisplay = (data: TStatsData): void => {
+    // Store latest data; if multiple messages arrive before next frame, only the last one is rendered
+    this._pendingData = data;
+    if (!this._rafId) {
+      this._rafId = requestAnimationFrame(this._flushDisplay);
+    }
+  };
+
+  private _flushDisplay = (): void => {
+    this._rafId = 0;
+    const data = this._pendingData;
+    if (!data) return;
+
+    // Skip all DOM writes when the tab is not visible — keep data so the
+    // next rAF after the tab becomes visible will use the latest snapshot.
+    if (document.hidden) return;
+
+    this._pendingData = null;
+    this._doUpdateDisplay(data);
+  };
+
+  private _doUpdateDisplay = (data: TStatsData): void => {
     this.updateMonitor(this.monitorCPUElement, data.cpu_utilization);
     this.updateMonitor(this.monitorRAMElement, data.ram_used_percent, data.ram_used, data.ram_total);
     this.updateMonitor(this.monitorHDDElement, data.hdd_used_percent, data.hdd_used, data.hdd_total);
@@ -112,9 +149,13 @@ export class MonitorUI extends ProgressBarUIBase {
         }
 
         this.updateMonitor(monitorSettings, gpu.gpu_temperature);
-        if (monitorSettings.cssColorFinal && monitorSettings.htmlMonitorSliderRef) {
-          monitorSettings.htmlMonitorSliderRef.style.backgroundColor =
-            `color-mix(in srgb, ${monitorSettings.cssColorFinal} ${gpu.gpu_temperature}%, ${monitorSettings.cssColor})`;
+        if (!this._numbersOnly && monitorSettings.cssColorFinal && monitorSettings.htmlMonitorSliderRef) {
+          const tempFloored = Math.floor(gpu.gpu_temperature);
+          if (monitorSettings._lastTempColor !== tempFloored) {
+            monitorSettings._lastTempColor = tempFloored;
+            monitorSettings.htmlMonitorSliderRef.style.backgroundColor =
+              `color-mix(in srgb, ${monitorSettings.cssColorFinal} ${tempFloored}%, ${monitorSettings.cssColor})`;
+          }
         }
       } else {
         // console.error('UpdateAllMonitors: no GPU VRAM data for index', index);
@@ -132,8 +173,19 @@ export class MonitorUI extends ProgressBarUIBase {
       return;
     }
 
+    const flooredPercent = Math.floor(percent);
+    // Skip all DOM writes if nothing has changed
+    if (monitorSettings._lastPercent === flooredPercent &&
+        monitorSettings._lastUsed === used &&
+        monitorSettings._lastTotal === total) {
+      return;
+    }
+    monitorSettings._lastPercent = flooredPercent;
+    monitorSettings._lastUsed = used;
+    monitorSettings._lastTotal = total;
+
     const prefix = monitorSettings.monitorTitle ? monitorSettings.monitorTitle + ' - ' : '';
-    let title = `${Math.floor(percent)}${monitorSettings.symbol}`;
+    let title = `${flooredPercent}${monitorSettings.symbol}`;
     let postfix = '';
 
     // Add max VRAM tracking for VRAM monitors
@@ -161,11 +213,16 @@ export class MonitorUI extends ProgressBarUIBase {
     if (monitorSettings.htmlMonitorRef) {
       monitorSettings.htmlMonitorRef.title = title;
     }
-    monitorSettings.htmlMonitorLabelRef.innerHTML = `${Math.floor(percent)}${monitorSettings.symbol}`;
-    monitorSettings.htmlMonitorSliderRef.style.width = `${Math.floor(percent)}%`;
+    monitorSettings.htmlMonitorLabelRef.textContent = `${flooredPercent}${monitorSettings.symbol}`;
+
+    // Skip slider transform when in numbers-only mode — no compositor work for hidden elements
+    if (!this._numbersOnly) {
+      monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${Math.min(flooredPercent / 100, 1).toFixed(4)})`;
+    }
   };
 
   updateAllAnimationDuration = (value: number): void => {
+    this.currentRate = value;
     this.updatedAnimationDuration(this.monitorCPUElement, value);
     this.updatedAnimationDuration(this.monitorRAMElement, value);
     this.updatedAnimationDuration(this.monitorHDDElement, value);
@@ -186,7 +243,69 @@ export class MonitorUI extends ProgressBarUIBase {
       return;
     }
 
-    slider.style.transition = `width ${value.toFixed(1)}s`;
+    // When smooth is disabled, the stylesheet handles transition:none globally.
+    // Only set inline transition when smooth is enabled.
+    if (!this._disableSmooth) {
+      slider.style.transition = `transform ${value.toFixed(1)}s linear`;
+    } else {
+      slider.style.transition = '';
+    }
+  };
+
+  setDisableSmooth = (value: boolean): void => {
+    this._disableSmooth = value;
+    this._applyDisableSmoothCSS();
+    this.updateAllAnimationDuration(this.currentRate);
+  };
+
+  private _applyDisableSmoothCSS = (): void => {
+    if (this._disableSmooth) {
+      this._disableSmoothSheet.innerText =
+        '#crysmonitor-monitors-root .crysmonitor-slider { transition: none !important; }';
+    } else {
+      this._disableSmoothSheet.innerText = '';
+    }
+  };
+
+  setNumbersOnly = (value: boolean): void => {
+    const wasNumbersOnly = this._numbersOnly;
+    this._numbersOnly = value;
+    this._applyNumbersOnlyCSS();
+
+    // When switching from numbers-only back to bars, invalidate cached values
+    // so the next updateMonitor() call writes fresh slider transforms.
+    if (wasNumbersOnly && !value) {
+      this._invalidateMonitorCaches();
+    }
+  };
+
+  private _invalidateMonitorCaches = (): void => {
+    const allSettings = [
+      this.monitorCPUElement,
+      this.monitorRAMElement,
+      this.monitorHDDElement,
+      ...this.monitorGPUSettings,
+      ...this.monitorVRAMSettings,
+      ...this.monitorTemperatureSettings,
+    ];
+    for (const s of allSettings) {
+      if (s) {
+        s._lastPercent = undefined;
+        s._lastUsed = undefined;
+        s._lastTotal = undefined;
+        s._lastTempColor = undefined;
+      }
+    }
+  };
+
+  private _applyNumbersOnlyCSS = (): void => {
+    if (this._numbersOnly) {
+      this._numbersOnlySheet.innerText =
+        '#crysmonitor-monitors-root .crysmonitor-slider { display: none !important; }' +
+        '#crysmonitor-monitors-root .crysmonitor-content { background-color: transparent !important; }';
+    } else {
+      this._numbersOnlySheet.innerText = '';
+    }
   };
 
   createMonitor = (monitorSettings?: TMonitorSettings): HTMLDivElement => {
@@ -229,7 +348,7 @@ export class MonitorUI extends ProgressBarUIBase {
     htmlMonitorLabel.classList.add('crysmonitor-label');
     monitorSettings.htmlMonitorLabelRef = htmlMonitorLabel;
     htmlMonitorContent.append(htmlMonitorLabel);
-    htmlMonitorLabel.innerHTML = '0%';
+    htmlMonitorLabel.textContent = '0%';
     return monitorSettings.htmlMonitorRef;
   };
 
