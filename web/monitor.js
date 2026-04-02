@@ -64,18 +64,19 @@ class CrysMonitorMonitor {
                     console.error(error);
                     return;
                 }
+                const zeroGpu = {
+                    gpu_utilization: 0,
+                    gpu_temperature: 0,
+                    vram_total: 0,
+                    vram_used: 0,
+                    vram_used_percent: 0,
+                };
                 const data = {
                     cpu_utilization: 0,
                     device: 'cpu',
-                    gpus: [
-                        {
-                            gpu_utilization: 0,
-                            gpu_temperature: 0,
-                            vram_total: 0,
-                            vram_used: 0,
-                            vram_used_percent: 0,
-                        },
-                    ],
+                    gpus: this.monitorGPUSettings.length > 0
+                        ? this.monitorGPUSettings.map(() => ({ ...zeroGpu }))
+                        : [zeroGpu],
                     hdd_total: 0,
                     hdd_used: 0,
                     hdd_used_percent: 0,
@@ -277,13 +278,13 @@ class CrysMonitorMonitor {
             return;
         }
         const monitorGPUNElement = {
-            id: 'CrysMonitor.ShowGpuUsage',
-            name: ' Usage',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'Usage'],
+            id: `CrysMonitor.ShowGpuUsage${index}`,
+            name: ` Usage (GPU ${index})`,
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'Usage'],
             type: 'boolean',
-            label: 'GPU',
+            label: `GPU${index}`,
             symbol: '%',
-            monitorTitle: `0: ${name}`,
+            monitorTitle: `${index}: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -306,13 +307,13 @@ class CrysMonitorMonitor {
         }
         // GPU VRAM Variables
         const monitorVRAMNElement = {
-            id: 'CrysMonitor.ShowGpuVram',
-            name: 'VRAM',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'VRAM'],
+            id: `CrysMonitor.ShowGpuVram${index}`,
+            name: `VRAM (GPU ${index})`,
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'VRAM'],
             type: 'boolean',
-            label: 'VRAM',
+            label: `VRAM${index}`,
             symbol: '%',
-            monitorTitle: `0: ${name}`,
+            monitorTitle: `${index}: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -335,13 +336,13 @@ class CrysMonitorMonitor {
         }
         // GPU Temperature Variables
         const monitorTemperatureNElement = {
-            id: 'CrysMonitor.ShowGpuTemperature',
-            name: 'Temperature',
-            category: ['CrysMonitor', `${this.menuPrefix} Show GPU`, 'Temperature'],
+            id: `CrysMonitor.ShowGpuTemperature${index}`,
+            name: `Temperature (GPU ${index})`,
+            category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'Temperature'],
             type: 'boolean',
-            label: 'Temp',
+            label: `Temp${index}`,
             symbol: '°',
-            monitorTitle: `0: ${name}`,
+            monitorTitle: `${index}: ${name}`,
             defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
@@ -408,8 +409,8 @@ class CrysMonitorMonitor {
         });
         app.ui.settings.addSetting(this.monitorHDDElement);
         void this.getGPUsFromServer().then((gpus) => {
-            if (gpus.length > 0) {
-                const { name, index } = gpus[0];
+            for (const gpu of gpus) {
+                const { name, index } = gpu;
                 this.createSettingsGPUTemp(name, index);
                 this.createSettingsGPUVRAM(name, index);
                 this.createSettingsGPUUsage(name, index);
