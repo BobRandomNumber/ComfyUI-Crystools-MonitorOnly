@@ -293,7 +293,7 @@ class CrysMonitorMonitor {
     };
   };
 
-  createSettingsGPUUsage = (name: string, index: number): void => {
+  createSettingsGPUUsage = (name: string, index: number, gpuCount: number): void => {
     if (name === undefined || index === undefined) {
       console.warn('getGPUsFromServer: name or index undefined', name, index);
       return;
@@ -301,10 +301,10 @@ class CrysMonitorMonitor {
 
     const monitorGPUNElement: TMonitorSettings = {
       id: `CrysMonitor.ShowGpuUsage${index}`,
-      name: ` Usage (GPU ${index})`,
-      category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'Usage'],
+      name: gpuCount === 1 ? ' Usage' : ` Usage (GPU ${index})`,
+      category: ['CrysMonitor', gpuCount === 1 ? `${this.menuPrefix} Show GPU` : `${this.menuPrefix} Show GPU ${index}`, 'Usage'],
       type: 'boolean',
-      label: `GPU${index}`,
+      label: gpuCount === 1 ? 'GPU' : `GPU${index}`,
       symbol: '%',
       monitorTitle: `${index}: ${name}`,
       defaultValue: true,
@@ -324,7 +324,7 @@ class CrysMonitorMonitor {
     this.monitorUI.createDOMGPUMonitor(this.monitorGPUSettings[index]);
   };
 
-  createSettingsGPUVRAM = (name: string, index: number): void => {
+  createSettingsGPUVRAM = (name: string, index: number, gpuCount: number): void => {
     if (name === undefined || index === undefined) {
       console.warn('getGPUsFromServer: name or index undefined', name, index);
       return;
@@ -333,10 +333,10 @@ class CrysMonitorMonitor {
     // GPU VRAM Variables
     const monitorVRAMNElement: TMonitorSettings = {
       id: `CrysMonitor.ShowGpuVram${index}`,
-      name: `VRAM (GPU ${index})`,
-      category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'VRAM'],
+      name: gpuCount === 1 ? 'VRAM' : `VRAM (GPU ${index})`,
+      category: ['CrysMonitor', gpuCount === 1 ? `${this.menuPrefix} Show GPU` : `${this.menuPrefix} Show GPU ${index}`, 'VRAM'],
       type: 'boolean',
-      label: `VRAM${index}`,
+      label: gpuCount === 1 ? 'VRAM' : `VRAM${index}`,
       symbol: '%',
       monitorTitle: `${index}: ${name}`,
       defaultValue: true,
@@ -356,7 +356,7 @@ class CrysMonitorMonitor {
     this.monitorUI.createDOMGPUMonitor(this.monitorVRAMSettings[index]);
   };
 
-  createSettingsGPUTemp = (name: string, index: number): void => {
+  createSettingsGPUTemp = (name: string, index: number, gpuCount: number): void => {
     if (name === undefined || index === undefined) {
       console.warn('getGPUsFromServer: name or index undefined', name, index);
       return;
@@ -365,10 +365,10 @@ class CrysMonitorMonitor {
     // GPU Temperature Variables
     const monitorTemperatureNElement: TMonitorSettings = {
       id: `CrysMonitor.ShowGpuTemperature${index}`,
-      name: `Temperature (GPU ${index})`,
-      category: ['CrysMonitor', `${this.menuPrefix} Show GPU ${index}`, 'Temperature'],
+      name: gpuCount === 1 ? 'Temperature' : `Temperature (GPU ${index})`,
+      category: ['CrysMonitor', gpuCount === 1 ? `${this.menuPrefix} Show GPU` : `${this.menuPrefix} Show GPU ${index}`, 'Temperature'],
       type: 'boolean',
-      label: `Temp${index}`,
+      label: gpuCount === 1 ? 'Temp' : `Temp${index}`,
       symbol: '°',
       monitorTitle: `${index}: ${name}`,
       defaultValue: true,
@@ -445,9 +445,9 @@ class CrysMonitorMonitor {
     void this.getGPUsFromServer().then((gpus: TGpuName[]): void => {
       for (const gpu of gpus) {
         const {name, index} = gpu;
-        this.createSettingsGPUTemp(name, index);
-        this.createSettingsGPUVRAM(name, index);
-        this.createSettingsGPUUsage(name, index);
+        this.createSettingsGPUTemp(name, index, gpus.length);
+        this.createSettingsGPUVRAM(name, index, gpus.length);
+        this.createSettingsGPUUsage(name, index, gpus.length);
       }
 
       this.finishedLoad();
