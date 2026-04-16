@@ -47,16 +47,18 @@ class CGPUInfo:
             self.anygpuLoaded = False
             self.pynvmlLoaded = False
 
+        # Cache device handles - they are stable for the driver lifetime
+        self.gpuHandles = []
+
         if self.anygpuLoaded:
             if self.deviceGetCount() > 0:
                 self.cudaDevicesFound = self.deviceGetCount()
 
                 for deviceIndex in range(self.cudaDevicesFound):
                     deviceHandle = self.deviceGetHandleByIndex(deviceIndex)
+                    self.gpuHandles.append(deviceHandle)
 
                     gpuName = self.deviceGetName(deviceHandle, deviceIndex)
-
-                    # logger.info(f"GPU:{deviceIndex}) {gpuName}")
 
                     self.gpus.append({
                         'index': deviceIndex,
@@ -69,7 +71,6 @@ class CGPUInfo:
                     self.gpusTemperature.append(True)
 
                 self.cuda = True
-                # logger.info(self.systemGetDriverVersion())
             else:
                 logger.warning('No GPU with CUDA detected.')
         else:
@@ -86,17 +87,9 @@ class CGPUInfo:
         return self.gpus
 
     def getStatus(self):
-        gpuUtilization = -1
-        gpuTemperature = -1
-        vramUsed = -1
-        vramTotal = -1
-        vramPercent = -1
-
-        gpuType = ''
         gpus = []
 
         if self.cudaDevice == 'cpu':
-            gpuType = 'cpu'
             gpus.append({
                 'gpu_utilization': -1,
                 'gpu_temperature': -1,
@@ -104,59 +97,61 @@ class CGPUInfo:
                 'vram_used': -1,
                 'vram_used_percent': -1,
             })
-        else:
-            gpuType = self.cudaDevice
+            return {
+                'device_type': 'cpu',
+                'gpus': gpus,
+            }
 
-            if self.anygpuLoaded and self.cuda and self.cudaAvailable:
-                for deviceIndex in range(self.cudaDevicesFound):
-                    deviceHandle = self.deviceGetHandleByIndex(deviceIndex)
+        if self.anygpuLoaded and self.cuda and self.cudaAvailable:
+            for deviceIndex in range(self.cudaDevicesFound):
+                gpuUtilization = -1
+                vramPercent = -1
+                vramUsed = -1
+                vramTotal = -1
+                gpuTemperature = -1
 
-                    gpuUtilization = -1
-                    vramPercent = -1
-                    vramUsed = -1
-                    vramTotal = -1
-                    gpuTemperature = -1
+                # Use cached handle instead of querying the driver each time
+                deviceHandle = self.gpuHandles[deviceIndex]
 
-                    # GPU Utilization
-                    if self.switchGPU and self.gpusUtilization[deviceIndex]:
-                        try:
-                            gpuUtilization = self.deviceGetUtilizationRates(deviceHandle)
-                        except Exception as e:
-                            logger.error('Could not get GPU utilization. ' + str(e))
-                            logger.error('Monitor of GPU is turning off.')
-                            self.switchGPU = False
+                # GPU Utilization
+                if self.switchGPU and self.gpusUtilization[deviceIndex]:
+                    try:
+                        gpuUtilization = self.deviceGetUtilizationRates(deviceHandle)
+                    except Exception as e:
+                        logger.error('Could not get GPU utilization. ' + str(e))
+                        logger.error('Monitor of GPU is turning off.')
+                        self.switchGPU = False
 
-                    if self.switchVRAM and self.gpusVRAM[deviceIndex]:
-                        try:
-                            memory = self.deviceGetMemoryInfo(deviceHandle)
-                            vramUsed = memory['used']
-                            vramTotal = memory['total']
+                if self.switchVRAM and self.gpusVRAM[deviceIndex]:
+                    try:
+                        memory = self.deviceGetMemoryInfo(deviceHandle)
+                        vramUsed = memory['used']
+                        vramTotal = memory['total']
 
-                            # Check if vramTotal is not zero or None
-                            if vramTotal and vramTotal != 0:
-                                vramPercent = vramUsed / vramTotal * 100
-                        except Exception as e:
-                            logger.error('Could not get GPU memory info. ' + str(e))
-                            self.switchVRAM = False
+                        if vramTotal and vramTotal != 0:
+                            vramPercent = vramUsed / vramTotal * 100
+                    except Exception as e:
+                        logger.error('Could not get GPU memory info. ' + str(e))
+                        self.switchVRAM = False
 
-                    # Temperature
-                    if self.switchTemperature and self.gpusTemperature[deviceIndex]:
-                        try:
-                            gpuTemperature = self.deviceGetTemperature(deviceHandle)
-                        except Exception as e:
-                            logger.error('Could not get GPU temperature. Turning off this feature. ' + str(e))
-                            self.switchTemperature = False
+                # Temperature
+                if self.switchTemperature and self.gpusTemperature[deviceIndex]:
+                    try:
+                        gpuTemperature = self.deviceGetTemperature(deviceHandle)
+                    except Exception as e:
+                        logger.error('Could not get GPU temperature. Turning off this feature. ' + str(e))
+                        self.switchTemperature = False
 
-                    gpus.append({
-                        'gpu_utilization': gpuUtilization,
-                        'gpu_temperature': gpuTemperature,
-                        'vram_total': vramTotal,
-                        'vram_used': vramUsed,
-                        'vram_used_percent': vramPercent,
-                    })
+                gpus.append({
+                    'gpu_utilization': gpuUtilization,
+                    'gpu_temperature': gpuTemperature,
+                    'vram_total': vramTotal,
+                    'vram_used': vramUsed,
+                    'vram_used_percent': vramPercent,
+                })
 
         return {
-            'device_type': gpuType,
+            'device_type': self.cudaDevice,
             'gpus': gpus,
         }
 
