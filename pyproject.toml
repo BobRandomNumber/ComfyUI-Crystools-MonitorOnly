@@ -1,7 +1,7 @@
 [project]
 name = "Crystools-MonitorOnly"
 description = "Resource monitor for Nvidia within ComfyUI"
-version = "0.9.4"
+version = "0.10.0"
 license = {file = "LICENSE"} 
 classifiers = [
 	"Environment :: GPU :: NVIDIA CUDA"
