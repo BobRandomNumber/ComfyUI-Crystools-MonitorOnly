@@ -2,10 +2,7 @@
 name = "Crystools-MonitorOnly"
 description = "Resource monitor for Nvidia within ComfyUI"
 version = "0.10.0"
-license = {file = "LICENSE"} 
-classifiers = [
-	"Environment :: GPU :: NVIDIA CUDA"
-]
+license = {file = "LICENSE"}
 
 dependencies = ["nvidia-ml-py"]
 
